@@ -1794,6 +1794,7 @@ buildCategories(DATA);
     if (password.length < 6) {
       return "La contraseña debe tener al menos 6 caracteres.";
     }
+    if(!document.querySelector('#reg-step-3 input[placeholder*="Interior de Salta"]')?.value.trim())return "Completa la zona de cobertura."; 
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -1808,7 +1809,7 @@ buildCategories(DATA);
         telefono: document.querySelector('#reg-step-3 input[type="tel"]')?.value || "",
         horario: document.querySelector('#reg-step-3 input[placeholder*="Lunes"]')?.value || "",
         especialidad: document.querySelector('#reg-step-3 select')?.value || "",
-        zona: document.querySelector('#reg-step-3 input[placeholder*="zona"]')?.value || "",
+        zona: document.querySelector('#reg-step-3 input[placeholder*="Interior de Salta"]')?.value || "",
         pagado: false,
         fechaRegistro: serverTimestamp(),
         estado: "activo"
@@ -1827,6 +1828,7 @@ buildCategories(DATA);
       if (e.code === "auth/weak-password") {
         return "La contraseña debe tener al menos 6 caracteres.";
       }
+      
       return "No pudimos guardar tu registro. Por favor, revisá tu conexión e intentá de nuevo.";
     }
   };
@@ -1857,7 +1859,7 @@ buildCategories(DATA);
         telefono: document.querySelector('#reg-step-m3 input[type="tel"]')?.value || "",
         horario: document.querySelector('#reg-step-m3 input[placeholder*="Lunes"]')?.value || "",
         especialidad: document.querySelector('#reg-step-m3 select')?.value || "",
-        zona: document.querySelector('#reg-step-m3 input[placeholder*="zona"]')?.value || "",
+        zona: document.querySelector('#reg-step-m3 input[placeholder*="interior de salta" ]')?.value || "",
         pagado: false,
         fechaRegistro: serverTimestamp(),
         estado: "activo"
