@@ -1982,3 +1982,16 @@ buildCategories(DATA);
 </script>
 </body>
 </html>
+
+<!-- PARCHE: zona obligatoria, profesionales sin zona visibles, autocompletado del buscador -->
+<script type="module">
+import { getApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+import { collection, setDoc, doc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const db = window._db;
+const h = s => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+
+// 1) Zona obligatoria (abogados y mediadores): se controla al pasar al pago
+function zonaOk(paso) {
+  const i = document.querySelector(paso + ' input[plac…
