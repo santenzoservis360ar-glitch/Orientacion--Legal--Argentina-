@@ -1982,16 +1982,346 @@ buildCategories(DATA);
 </script>
 </body>
 </html>
-
-<!-- PARCHE: zona obligatoria, profesionales sin zona visibles, autocompletado del buscador -->
+<style>
+.ing-ro[disabled] { background: var(--fondo); color: var(--gris); cursor: not-allowed; }
+</style>
+<div class="modal-overlay" id="ingresoModal">
+<div class="modal" style="max-width:480px">
+<div class="modal-head">
+<div class="modal-title-wrap">
+<div class="modal-eyebrow" id="ingEyebrow" style="color:var(--camel)">🔑 Profesionales</div>
+<div class="modal-title">Ingresar a mis registros</div>
+</div>
+<button class="modal-close" id="ingCerrarX">✕</button>
+</div>
+<div id="ingPasoLogin">
+<div class="modal-body">
+<p style="font-size:0.88rem;color:var(--gris);margin-bottom:16px;line-height:1.6">
+Ingresá con el mail y la contraseña que pusiste cuando te registraste.
+</p>
+<div class="form-grid">
+<div class="form-group full">
+<label>Email</label>
+<input type="email" id="ingEmail" autocomplete="username">
+</div>
+<div class="form-group full">
+<label>Contraseña</label>
+<input type="password" id="ingPass" autocomplete="current-password">
+</div>
+</div>
+<div id="ingMsgLogin" style="margin-top:12px;font-size:0.85rem;line-height:1.5"></div>
+<div style="margin-top:10px;text-align:center">
+<button class="btn-close-lawyer" id="ingOlvide">Olvidé mi contraseña</button>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn-primary" id="ingBtnEntrar">Ingresar</button>
+<button class="btn-secondary" id="ingBtnCancelar">Cancelar</button>
+</div>
+</div>
+<div id="ingPasoFicha" style="display:none">
+<div class="modal-body">
+<div class="form-grid">
+<div class="form-group">
+<label>Nombre</label>
+<input type="text" id="fNombre" class="ing-ro" disabled>
+</div>
+<div class="form-group">
+<label>Apellido</label>
+<input type="text" id="fApellido" class="ing-ro" disabled>
+</div>
+<div class="form-group full">
+<label>Especialidad</label>
+<input type="text" id="fEspecialidad" class="ing-ro" disabled>
+</div>
+<div class="form-group">
+<label>Email</label>
+<input type="text" id="fEmail" class="ing-ro" disabled>
+</div>
+<div class="form-group">
+<label>Teléfono</label>
+<input type="text" id="fTelefono" class="ing-ro" disabled>
+</div>
+<div class="form-group">
+<label>Zona de cobertura</label>
+<input type="text" id="fZona" class="ing-ro" disabled>
+</div>
+<div class="form-group">
+<label>Horario</label>
+<input type="text" id="fHorario" class="ing-ro" disabled>
+</div>
+<div class="form-group full">
+<label id="fDomLabel">Domicilio</label>
+<input type="text" id="fDomicilio" placeholder="Calle, número, piso, ciudad" maxlength="200">
+</div>
+</div>
+<div style="font-size:0.78rem;color:var(--gris);margin-top:8px;line-height:1.5">
+Solo podés cambiar el domicilio. Para modificar otro dato, comunicate con la plataforma.
+</div>
+<div id="ingMsgFicha" style="margin-top:12px;font-size:0.85rem;line-height:1.5"></div>
+</div>
+<div class="modal-footer">
+<button class="btn-primary" id="ingBtnGuardar">Guardar domicilio</button>
+<button class="btn-secondary" id="ingBtnSalir">Cerrar sesión</button>
+</div>
+</div>
+</div>
+</div>
 <script type="module">
 import { getApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
-import { collection, setDoc, doc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-const db = window._db;
-const h = s => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
-
-// 1) Zona obligatoria (abogados y mediadores): se controla al pasar al pago
-function zonaOk(paso) {
-  const i = document.querySelector(paso + ' input[plac…
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+const app = getApp();
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const h = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+function mapsUrl(domicilio, zona) {
+const q = [domicilio, zona, "Argentina"].filter(x => x && String(x).trim()).join(", ");
+return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
+}
+const CFG = {
+abogado:  { sel: "ciudadanoEspecialidadSelect",         zona: "ciudadanoZonaInput",         out: "resultadoSorteoAbogado",  plural: "abogados" },
+mediador: { sel: "ciudadanoEspecialidadMediadorSelect", zona: "ciudadanoZonaMediadorInput", out: "resultadoSorteoMediador", plural: "mediadores" }
+};
+async function buscar(tipo) {
+const c = CFG[tipo];
+const out = $(c.out);
+const esp = $(c.sel)?.value || "";
+const zona = ($(c.zona)?.value || "").trim().toLowerCase();
+if (!esp) {
+out.innerHTML = `<div style="color:var(--rojo,#c0392b);margin-top:8px">Por favor, seleccioná una especialidad.</div>`;
+return;
+}
+out.innerHTML = `<div style="margin-top:8px">Buscando ${tipo} disponible…</div>`;
+try {
+const q = query(
+collection(db, "profesionales"),
+where("tipo", "==", tipo),
+where("especialidad", "==", esp),
+where("estado", "==", "activo")
+);
+const snap = await getDocs(q);
+let cand = [];
+snap.forEach(d => cand.push(d.data()));
+if (zona) cand = cand.filter(x => (x.zona || "").toLowerCase().includes(zona));
+if (cand.length === 0) {
+out.innerHTML = `<div style="margin-top:8px">No hay ${c.plural} disponibles todavía en "${h(esp)}"${zona ? ` para la zona indicada` : ""}. Probá con otra especialidad, otra zona, o volvé a intentar más tarde.</div>`;
+return;
+}
+const e = cand[Math.floor(Math.random() * cand.length)];
+const dom = (e.domicilio || "").trim();
+const lineaDom = dom
+? `<div>🗺️ <a href="${h(mapsUrl(dom, e.zona))}" target="_blank" rel="noopener" style="color:var(--bordo);font-weight:600;text-decoration:underline">${h(dom)} · Ver en Google Maps</a></div>`
+: "";
+out.innerHTML = `
+<div class="plan-card" style="text-align:left;margin-top:8px">
+<div class="plan-name" style="font-size:1rem">${h(e.nombre)} ${h(e.apellido)}</div>
+<div style="margin-top:6px">📍 ${h(e.zona) || "Zona no especificada"}</div>
+${lineaDom}
+<div>📞 ${h(e.telefono) || "-"}</div>
+<div>✉️ ${h(e.email) || "-"}</div>
+<div style="margin-top:6px;color:var(--gris)">${h(e.especialidad)}</div>
+</div>
+`;
+} catch (err) {
+console.error("Error sorteando " + tipo + ":", err);
+out.innerHTML = `<div style="color:var(--rojo,#c0392b);margin-top:8px">Ocurrió un error al buscar. Intentá de nuevo.</div>`;
+}
+}
+window.sortearAbogado = () => buscar("abogado");
+window.sortearMediador = () => buscar("mediador");
+let uidActual = null;
+let entroAqui = false;   // true si la sesión la abrió este formulario
+function mostrarPaso(p) {
+$("ingPasoLogin").style.display = p === "login" ? "block" : "none";
+$("ingPasoFicha").style.display = p === "ficha" ? "block" : "none";
+}
+function mensaje(el, texto, ok) {
+el.style.color = ok ? "#2d7a3a" : "#c0392b";
+el.textContent = texto;
+}
+function abrir(tipo) {
+if (tipo === "abogado") { if (window.closeLawyerModal) window.closeLawyerModal(); }
+else { if (window.closeMediadorModal) window.closeMediadorModal(); }
+$("ingEyebrow").textContent = tipo === "abogado" ? "⚖️ Abogados" : "🤝 Mediadores";
+$("ingEmail").value = "";
+$("ingPass").value = "";
+$("ingMsgLogin").textContent = "";
+$("ingMsgFicha").textContent = "";
+mostrarPaso("login");
+$("ingresoModal").classList.add("open");
+document.body.style.overflow = "hidden";
+}
+function cerrar() {
+$("ingresoModal").classList.remove("open");
+document.body.style.overflow = "";
+$("ingPass").value = "";
+if (entroAqui) {
+entroAqui = false;
+uidActual = null;
+signOut(auth).catch(() => {});
+}
+}
+function errorAuth(e) {
+switch (e && e.code) {
+case "auth/invalid-credential":
+case "auth/wrong-password":
+case "auth/user-not-found":
+return "El email o la contraseña no son correctos.";
+case "auth/invalid-email":
+return "El email ingresado no es válido.";
+case "auth/too-many-requests":
+return "Demasiados intentos. Esperá unos minutos o tocá “Olvidé mi contraseña”.";
+case "auth/network-request-failed":
+return "Sin conexión. Revisá tu internet e intentá de nuevo.";
+default:
+return "No pudimos ingresar. Intentá de nuevo.";
+}
+}
+function cargarFicha(uid, d) {
+uidActual = uid;
+$("fNombre").value = d.nombre || "";
+$("fApellido").value = d.apellido || "";
+$("fEspecialidad").value = d.especialidad || "";
+$("fEmail").value = d.email || "";
+$("fTelefono").value = d.telefono || "";
+$("fZona").value = d.zona || "";
+$("fHorario").value = d.horario || "";
+$("fDomLabel").textContent = d.tipo === "mediador" ? "Domicilio profesional" : "Domicilio jurídico";
+$("fDomicilio").value = d.domicilio || "";
+$("ingMsgFicha").textContent = "";
+$("ingresoModal").dataset.zona = d.zona || "";
+mostrarPaso("ficha");
+}
+async function entrar() {
+const email = $("ingEmail").value.trim();
+const pass = $("ingPass").value;
+const msg = $("ingMsgLogin");
+if (!email || !pass) { mensaje(msg, "Completá el email y la contraseña.", false); return; }
+const btn = $("ingBtnEntrar");
+btn.disabled = true;
+btn.textContent = "Ingresando…";
+msg.textContent = "";
+try {
+const cred = await signInWithEmailAndPassword(auth, email, pass);
+entroAqui = true;
+const snap = await getDoc(doc(db, "profesionales", cred.user.uid));
+if (!snap.exists()) {
+entroAqui = false;
+await signOut(auth);
+mensaje(msg, "No encontramos una ficha profesional asociada a este email.", false);
+return;
+}
+$("ingPass").value = "";
+cargarFicha(cred.user.uid, snap.data());
+} catch (e) {
+console.error("Error al ingresar:", e);
+mensaje(msg, errorAuth(e), false);
+} finally {
+btn.disabled = false;
+btn.textContent = "Ingresar";
+}
+}
+async function olvide() {
+const email = $("ingEmail").value.trim();
+const msg = $("ingMsgLogin");
+if (!email) { mensaje(msg, "Escribí tu email arriba y volvé a tocar “Olvidé mi contraseña”.", false); return; }
+try {
+await sendPasswordResetEmail(auth, email);
+mensaje(msg, "Si ese email está registrado, te enviamos un mensaje para crear una contraseña nueva. Revisá también la carpeta de spam.", true);
+} catch (e) {
+console.error("Error al restablecer contraseña:", e);
+if (e.code === "auth/invalid-email") mensaje(msg, "El email ingresado no es válido.", false);
+else if (e.code === "auth/network-request-failed") mensaje(msg, "Sin conexión. Revisá tu internet e intentá de nuevo.", false);
+else mensaje(msg, "Si ese email está registrado, te enviamos un mensaje para crear una contraseña nueva. Revisá también la carpeta de spam.", true);
+}
+}
+async function guardar() {
+const msg = $("ingMsgFicha");
+const nuevo = $("fDomicilio").value.trim();
+if (!nuevo) { mensaje(msg, "Escribí el domicilio.", false); return; }
+if (!uidActual) { mensaje(msg, "Tu sesión se cerró. Volvé a ingresar.", false); return; }
+const btn = $("ingBtnGuardar");
+btn.disabled = true;
+btn.textContent = "Guardando…";
+try {
+await updateDoc(doc(db, "profesionales", uidActual), { domicilio: nuevo });
+const zona = $("ingresoModal").dataset.zona || "";
+msg.style.color = "#2d7a3a";
+msg.innerHTML = `✅ Domicilio actualizado. <a href="${h(mapsUrl(nuevo, zona))}" target="_blank" rel="noopener" style="color:var(--bordo);font-weight:600;text-decoration:underline">Ver en Google Maps</a>`;
+} catch (e) {
+console.error("Error guardando domicilio:", e);
+mensaje(msg, "No pudimos guardar el cambio (" + (e.code || e.message || "error") + "). Intentá de nuevo.", false);
+} finally {
+btn.disabled = false;
+btn.textContent = "Guardar domicilio";
+}
+}
+window.guardarMediador = async function () {
+const email = document.querySelector('#reg-step-m3 input[type="email"]')?.value || "";
+const password = document.querySelector('#reg-step-m3 input[type="password"]')?.value || "";
+const zona = (document.querySelector('#reg-step-m3 input[placeholder*="Interior de Salta"]')?.value || "").trim();
+if (!email || !password) {
+return "Completá el email y la contraseña antes de confirmar.";
+}
+if (password.length < 6) {
+return "La contraseña debe tener al menos 6 caracteres.";
+}
+if (!zona) return "Completa la zona de cobertura.";
+try {
+const cred = await createUserWithEmailAndPassword(auth, email, password);
+const uid = cred.user.uid;
+const datos = {
+tipo: "mediador",
+nombre: document.querySelector('#reg-step-m3 input[placeholder="Nombre/s"]')?.value || "",
+apellido: document.querySelector('#reg-step-m3 input[placeholder="Apellido/s"]')?.value || "",
+domicilio: document.querySelector('#reg-step-m3 input[placeholder="Calle, número, piso, ciudad"]')?.value || "",
+email: email,
+telefono: document.querySelector('#reg-step-m3 input[type="tel"]')?.value || "",
+horario: document.querySelector('#reg-step-m3 input[placeholder*="Lunes"]')?.value || "",
+especialidad: document.querySelector('#reg-step-m3 select')?.value || "",
+zona: zona,
+pagado: false,
+fechaRegistro: serverTimestamp(),
+estado: "activo"
+};
+await setDoc(doc(db, "profesionales", uid), datos);
+console.log("Mediador guardado");
+return true;
+} catch (e) {
+console.error("Error guardando mediador:", e);
+if (e.code === "auth/email-already-in-use") {
+return "Ese email ya está registrado. Si ya te habías registrado antes, contactanos para ayudarte.";
+}
+if (e.code === "auth/invalid-email") {
+return "El email ingresado no es válido.";
+}
+if (e.code === "auth/weak-password") {
+return "La contraseña debe tener al menos 6 caracteres.";
+}
+return "No pudimos guardar tu registro. Por favor, revisá tu conexión e intentá de nuevo.";
+}
+};
+function agregarBoton(modalId, tipo) {
+const base = document.querySelector("#" + modalId + " .btn-registro-abogado");
+if (!base || base.dataset.conIngreso) return;
+base.dataset.conIngreso = "1";
+const b = document.createElement("button");
+b.className = "btn-registro-abogado";
+b.style.marginTop = "10px";
+b.textContent = "🔑 Ingresar a mis registros";
+b.addEventListener("click", () => abrir(tipo));
+base.insertAdjacentElement("afterend", b);
+}
+agregarBoton("lawyerModal", "abogado");
+agregarBoton("mediadorModal", "mediador");
+$("ingBtnEntrar").addEventListener("click", entrar);
+$("ingPass").addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
+$("ingOlvide").addEventListener("click", olvide);
+$("ingBtnGuardar").addEventListener("click", guardar);
+$("ingBtnSalir").addEventListener("click", cerrar);
+$("ingBtnCancelar").addEventListener("click", cerrar);
+$("ingCerrarX").addEventListener("click", cerrar);
+$("ingresoModal").addEventListener("click", e => { if (e.target === $("ingresoModal")) cerrar(); });
+</script>
