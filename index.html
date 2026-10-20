@@ -2325,3 +2325,38 @@ $("ingBtnCancelar").addEventListener("click", cerrar);
 $("ingCerrarX").addEventListener("click", cerrar);
 $("ingresoModal").addEventListener("click", e => { if (e.target === $("ingresoModal")) cerrar(); });
 </script>
+<style>
+.modal-desc:empty { display: none; }
+</style>
+<script>
+if (!DATA.some(c => c.id === 'penal')) {
+  DATA.push(
+    {
+      id: 'penal',
+      name: 'Fuero Penal',
+      icon: '🚔',
+      color: '#7B2D3E',
+      bg: '#F7F0F2',
+      tramites: [
+        { name: 'Denuncia penal', desc: '', reqs: ['DNI del denunciante (documento que acredite su identidad)','Relato claro de los hechos: qué pasó, cuándo, dónde y cómo','Datos de la persona denunciada, si se conocen (nombre, apodo, domicilio, descripción)','Datos de testigos, si los hay','Pruebas disponibles: fotos, videos, capturas de pantalla, mensajes, audios','Certificado médico, si hubo lesiones','Facturas, títulos o comprobantes de lo robado o dañado','Si contratás abogado: tus datos personales y esta documentación para que pueda iniciar el trámite'] },
+        { name: 'Robo y hurto', desc: '', reqs: ['DNI del denunciante','Relato de los hechos: fecha, hora, lugar y cómo ocurrió','Descripción de lo sustraído (marca, modelo, número de serie o IMEI, valor aproximado)','Facturas, comprobantes o fotos que acrediten que los objetos eran tuyos','Datos y descripción de quien lo hizo, si lo viste','Testigos y cámaras cercanas (comercios, domicilios)','Certificado médico, si hubo lesiones','Si se llevaron tarjetas o celular: aviso de bloqueo al banco o a la empresa'] },
+        { name: 'Violencia de género', desc: '', reqs: ['DNI de la persona denunciante (no es excluyente: se puede denunciar sin documentos)','Relato de los hechos, con fechas aproximadas','Datos de la persona denunciada y vínculo con ella','Pruebas: mensajes, capturas, audios, fotos, videos','Certificado médico o constancia de lesiones, si las hubo','Datos de testigos, si los hay','Denuncias o antecedentes anteriores, si existen','Datos de hijos o personas a cargo, si corresponde'] },
+        { name: 'Lesiones y amenazas', desc: '', reqs: ['DNI del denunciante','Relato de los hechos: qué pasó, cuándo y dónde','Certificado médico o constancia del hospital, si hubo lesiones','Fotos de las lesiones','Capturas, mensajes o audios de las amenazas','Datos de quien agredió o amenazó','Datos de testigos, si los hay'] },
+        { name: 'Estafas y delitos informáticos', desc: '', reqs: ['DNI del denunciante','Relato ordenado de lo ocurrido, con fechas','Comprobantes de transferencias o pagos (número de operación, alias o CBU, banco)','Capturas de conversaciones, publicaciones, perfiles y links','Datos de la persona o cuenta que te estafó (alias, teléfono, usuario)','Aviso al banco o a la billetera virtual para bloquear y reclamar','Factura o publicación de lo que compraste, si corresponde'] },
+      ]
+    },
+    {
+      id: 'penalmenores',
+      name: 'Fuero Penal de Menores',
+      icon: '🧒',
+      color: '#4A2E1A',
+      bg: '#F5F0EC',
+      tramites: [
+        { name: 'Proceso penal juvenil', desc: 'Si un adolescente está acusado, es clave asegurar defensa legal y reunir datos básicos de la causa y citaciones. Esta información es orientativa; no es necesario contar con todos los documentos para pedir ayuda.', reqs: ['DNI y partida de nacimiento del adolescente','DNI del padre, madre o responsable legal','Número de causa, juzgado o fiscalía interviniente','Citaciones o notificaciones recibidas','Certificado de escolaridad','Constancia de domicilio y de situación familiar','Designación del abogado defensor (particular u oficial)'] },
+        { name: 'Denuncia cuando un menor es víctima', desc: 'Si un menor es víctima, se puede denunciar con la información disponible y pedir orientación. Esta información es orientativa; no es necesario contar con todos los documentos para pedir ayuda.', reqs: ['DNI del adulto que realiza la denuncia','DNI o partida de nacimiento del menor','Relato de los hechos: qué pasó, cuándo, dónde y quién','Datos de la persona denunciada, si se conocen','Certificado médico, si hubo lesiones','Pruebas disponibles: mensajes, capturas, fotos, audios','Datos de testigos o de la escuela, si corresponde'] },
+      ]
+    }
+  );
+  buildCategories(DATA);
+}
+</script>
