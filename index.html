@@ -2486,3 +2486,36 @@ ${lineaDom}
 window.sortearAbogado = () => buscarRotando("abogado");
 window.sortearMediador = () => buscarRotando("mediador");
 </script>
+<!-- OJITO EN INGRESAR A MIS REGISTROS -->
+<script>
+(function () {
+  var inp = document.getElementById('ingPass');
+  var modal = document.getElementById('ingresoModal');
+  if (!inp || !modal) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'pass-wrap';
+  inp.parentNode.insertBefore(wrap, inp);
+  wrap.appendChild(inp);
+
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'pass-ojo';
+  b.textContent = '👁️';
+  b.setAttribute('aria-label', 'Mostrar u ocultar contraseña');
+  b.addEventListener('click', function () {
+    var ver = inp.type === 'password';
+    inp.type = ver ? 'text' : 'password';
+    b.textContent = ver ? '🙈' : '👁️';
+  });
+  wrap.appendChild(b);
+
+  // Al cerrar la ventana, vuelve a ocultar la contraseña
+  new MutationObserver(function () {
+    if (!modal.classList.contains('open')) {
+      inp.type = 'password';
+      b.textContent = '👁️';
+    }
+  }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+})();
+</script>
