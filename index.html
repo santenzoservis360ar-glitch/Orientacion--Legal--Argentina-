@@ -2360,3 +2360,129 @@ if (!DATA.some(c => c.id === 'penal')) {
   buildCategories(DATA);
 }
 </script>
+<!-- OJITO CONTRASEÑA + ROTACIÓN -->
+<style>
+.pass-wrap { position: relative; display: flex; }
+.pass-wrap input { width: 100%; padding-right: 42px; }
+.pass-ojo { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 4px; line-height: 1; }
+</style>
+
+<script>
+(function () {
+  var campos = document.querySelectorAll('#reg-step-3 input[type="password"], #reg-step-m3 input[type="password"]');
+
+  function ocultarTodas() {
+    campos.forEach(function (inp) {
+      inp.type = 'password';
+      var b = inp.parentNode.querySelector('.pass-ojo');
+      if (b) b.textContent = '👁️';
+    });
+  }
+
+  campos.forEach(function (inp) {
+    var wrap = document.createElement('div');
+    wrap.className = 'pass-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pass-ojo';
+    b.textContent = '👁️';
+    b.setAttribute('aria-label', 'Mostrar u ocultar contraseña');
+    b.addEventListener('click', function () {
+      var ver = inp.type === 'password';
+      inp.type = ver ? 'text' : 'password';
+      b.textContent = ver ? '🙈' : '👁️';
+    });
+    wrap.appendChild(b);
+  });
+
+  // Antes de confirmar el registro, vuelve a ocultar la contraseña
+  // para que el guardado la encuentre como siempre
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('#btn-confirmar-abogado, #btn-confirmar-mediador')) {
+      ocultarTodas();
+    }
+  }, true);
+})();
+</script>
+
+<script type="module">
+import { getApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const db = getFirestore(getApp());
+const $ = id => document.getElementById(id);
+const h = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+function mapsUrl(domicilio, zona) {
+  const q = [domicilio, zona, "Argentina"].filter(x => x && String(x).trim()).join(", ");
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
+}
+
+const CFG = {
+  abogado:  { sel: "ciudadanoEspecialidadSelect",         zona: "ciudadanoZonaInput",         out: "resultadoSorteoAbogado",  plural: "abogados" },
+  mediador: { sel: "ciudadanoEspecialidadMediadorSelect", zona: "ciudadanoZonaMediadorInput", out: "resultadoSorteoMediador", plural: "mediadores" }
+};
+
+// Rotación: en cada búsqueda muestra al siguiente de la lista (nunca repite al anterior)
+function siguiente(tipo, esp, zona, cand) {
+  cand.sort((a, b) => (a.id < b.id ? -1 : 1));
+  const key = "rot_" + tipo + "_" + esp + "_" + zona;
+  let ultimo = null;
+  try { ultimo = localStorage.getItem(key); } catch (e) {}
+  let i = cand.findIndex(x => x.id === ultimo);
+  i = (i === -1) ? Math.floor(Math.random() * cand.length) : (i + 1) % cand.length;
+  try { localStorage.setItem(key, cand[i].id); } catch (e) {}
+  return cand[i];
+}
+
+async function buscarRotando(tipo) {
+  const c = CFG[tipo];
+  const out = $(c.out);
+  const esp = $(c.sel)?.value || "";
+  const zona = ($(c.zona)?.value || "").trim().toLowerCase();
+  if (!esp) {
+    out.innerHTML = `<div style="color:var(--rojo,#c0392b);margin-top:8px">Por favor, seleccioná una especialidad.</div>`;
+    return;
+  }
+  out.innerHTML = `<div style="margin-top:8px">Buscando ${tipo} disponible…</div>`;
+  try {
+    const q = query(
+      collection(db, "profesionales"),
+      where("tipo", "==", tipo),
+      where("especialidad", "==", esp),
+      where("estado", "==", "activo")
+    );
+    const snap = await getDocs(q);
+    let cand = [];
+    snap.forEach(d => cand.push({ ...d.data(), id: d.id }));
+    if (zona) cand = cand.filter(x => (x.zona || "").toLowerCase().includes(zona));
+    if (cand.length === 0) {
+      out.innerHTML = `<div style="margin-top:8px">No hay ${c.plural} disponibles todavía en "${h(esp)}"${zona ? ` para la zona indicada` : ""}. Probá con otra especialidad, otra zona, o volvé a intentar más tarde.</div>`;
+      return;
+    }
+    const e = siguiente(tipo, esp, zona, cand);
+    const dom = (e.domicilio || "").trim();
+    const lineaDom = dom
+      ? `<div>🗺️ <a href="${h(mapsUrl(dom, e.zona))}" target="_blank" rel="noopener" style="color:var(--bordo);font-weight:600;text-decoration:underline">${h(dom)} · Ver en Google Maps</a></div>`
+      : "";
+    out.innerHTML = `
+<div class="plan-card" style="text-align:left;margin-top:8px">
+<div class="plan-name" style="font-size:1rem">${h(e.nombre)} ${h(e.apellido)}</div>
+<div style="margin-top:6px">📍 ${h(e.zona) || "Zona no especificada"}</div>
+${lineaDom}
+<div>📞 ${h(e.telefono) || "-"}</div>
+<div>✉️ ${h(e.email) || "-"}</div>
+<div style="margin-top:6px;color:var(--gris)">${h(e.especialidad)}</div>
+</div>
+`;
+  } catch (err) {
+    console.error("Error sorteando " + tipo + ":", err);
+    out.innerHTML = `<div style="color:var(--rojo,#c0392b);margin-top:8px">Ocurrió un error al buscar. Intentá de nuevo.</div>`;
+  }
+}
+
+window.sortearAbogado = () => buscarRotando("abogado");
+window.sortearMediador = () => buscarRotando("mediador");
+</script>
